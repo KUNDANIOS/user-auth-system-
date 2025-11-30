@@ -34,8 +34,8 @@ Before running this project, make sure you have:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/KUNDANIOS/user-auth-system.git
-cd user-auth-system
+git clone https://github.com/KUNDANIOS/user-auth-system-.git
+cd user-auth-system-
 ```
 
 2. Install dependencies:
@@ -47,7 +47,7 @@ npm install
 ```env
 JWT_SECRET=your-secret-key-change-in-production
 JWT_EXPIRY=24h
-MONGODB_URI=mongodb://localhost:27017/your-database-name
+MONGODB_URI=mongodb://localhost:27017/auth-system
 PORT=5000
 ```
 
@@ -55,6 +55,8 @@ PORT=5000
    - Replace `JWT_SECRET` with a strong, unique secret key
    - Update `MONGODB_URI` with your MongoDB connection string
    - Adjust `PORT` if needed
+
+5. Make sure MongoDB is running on your system
 
 ## Running the Application
 
@@ -69,6 +71,57 @@ npm run dev
 ```
 
 The server will start on `http://localhost:5000` (or your specified PORT).
+
+## Testing the Application
+
+### Method 1: Using the HTML Interface
+1. Open your browser and go to `http://localhost:5000`
+2. You'll see the authentication interface
+3. Try registering a new user and then logging in
+
+### Method 2: Using API Testing Tools (Postman, Thunder Client, or cURL)
+
+**Test Registration:**
+```bash
+curl -X POST http://localhost:5000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"testuser","email":"test@example.com","password":"Test123456"}'
+```
+
+**Test Login:**
+```bash
+curl -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"Test123456"}'
+```
+
+**Test Protected Route (use token from login response):**
+```bash
+curl -X GET http://localhost:5000/api/auth/profile \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN_HERE"
+```
+
+### Expected Responses
+
+**Successful Registration:**
+```json
+{
+  "message": "User registered successfully",
+  "userId": "507f1f77bcf86cd799439011"
+}
+```
+
+**Successful Login:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "507f1f77bcf86cd799439011",
+    "username": "testuser",
+    "email": "test@example.com"
+  }
+}
+```
 
 ## API Endpoints
 
