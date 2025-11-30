@@ -4,9 +4,11 @@
   "description": "User authentication system with JWT and MongoDB",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
-  },
+  "start": "node server.js",
+  "dev": "nodemon server.js",
+  "build": "echo 'No build step required'"
+},
+
   "keywords": [
     "auth",
     "jwt",
