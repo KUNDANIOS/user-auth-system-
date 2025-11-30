@@ -1,0 +1,455 @@
+// User Authentication System with JWT and MongoDB
+// Dependencies: express, bcrypt, jsonwebtoken, dotenv, mongodb
+
+const express = require('express');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const { MongoClient, ObjectId } = require('mongodb');
+const cors = require('cors');  // ADD THIS LINE
+require('dotenv').config();
+
+const app = express();
+app.use(express.json());
+app.use(cors());
+
+// Configuration
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_EXPIRY = '24h';
+const SALT_ROUNDS = 10;
+const MONGODB_URI = process.env.MONGODB_URI;
+
+// MongoDB Client
+let db;
+let usersCollection;
+
+// Connect to MongoDB
+async function connectToDatabase() {
+  try {
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    db = client.db('auth_db');
+    usersCollection = db.collection('users');
+    
+    // Create unique indexes
+    await usersCollection.createIndex({ email: 1 }, { unique: true });
+    await usersCollection.createIndex({ username: 1 }, { unique: true });
+    
+    console.log('Connected to MongoDB successfully!');
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    process.exit(1);
+  }
+}
+
+// ==================== UTILITY FUNCTIONS ====================
+
+const generateToken = (userId) => {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+};
+
+const validateEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const validatePassword = (password) => {
+  return password.length >= 8 &&
+         /[A-Z]/.test(password) &&
+         /[a-z]/.test(password) &&
+         /[0-9]/.test(password);
+};
+
+// ==================== MIDDLEWARE ====================
+
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ 
+      success: false, 
+      message: 'Access token required' 
+    });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) {
+      if (err.name === 'TokenExpiredError') {
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Token expired' 
+        });
+      }
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Invalid token' 
+      });
+    }
+
+    req.userId = decoded.userId;
+    next();
+  });
+};
+
+// ==================== AUTH ROUTES ====================
+
+// Signup endpoint
+app.post('/api/auth/signup', async (req, res) => {
+  try {
+    const { username, email, password } = req.body;
+
+    // Validation
+    if (!username || !email || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Username, email, and password are required' 
+      });
+    }
+
+    if (!validateEmail(email)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid email format' 
+      });
+    }
+
+    if (!validatePassword(password)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Password must be at least 8 characters with uppercase, lowercase, and number' 
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await usersCollection.findOne({
+      $or: [{ email }, { username }]
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ 
+        success: false, 
+        message: 'Username or email already exists' 
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+    // Create user
+    const newUser = {
+      username,
+      email,
+      password: hashedPassword,
+      createdAt: new Date()
+    };
+
+    const result = await usersCollection.insertOne(newUser);
+    const userId = result.insertedId.toString();
+
+    // Generate token
+    const token = generateToken(userId);
+
+    res.status(201).json({
+      success: true,
+      message: 'User created successfully',
+      data: {
+        userId,
+        username,
+        email,
+        token
+      }
+    });
+
+  } catch (error) {
+    console.error('Signup error:', error);
+    
+    if (error.code === 11000) {
+      return res.status(409).json({ 
+        success: false, 
+        message: 'Username or email already exists' 
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error during signup' 
+    });
+  }
+});
+
+// Login endpoint
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { emailOrUsername, password } = req.body;
+
+    // Validation
+    if (!emailOrUsername || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email/username and password are required' 
+      });
+    }
+
+    // Find user
+    const user = await usersCollection.findOne({
+      $or: [{ email: emailOrUsername }, { username: emailOrUsername }]
+    });
+
+    if (!user) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Invalid credentials' 
+      });
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Invalid credentials' 
+      });
+    }
+
+    // Generate token
+    const token = generateToken(user._id.toString());
+
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        userId: user._id.toString(),
+        username: user.username,
+        email: user.email,
+        token
+      }
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error during login' 
+    });
+  }
+});
+
+// Token refresh endpoint
+app.post('/api/auth/refresh', authenticateToken, (req, res) => {
+  try {
+    const newToken = generateToken(req.userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Token refreshed successfully',
+      data: { token: newToken }
+    });
+
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error during token refresh' 
+    });
+  }
+});
+
+// ==================== PROTECTED ROUTES ====================
+
+// Get current user profile (protected)
+app.get('/api/user/profile', authenticateToken, async (req, res) => {
+  try {
+    const user = await usersCollection.findOne(
+      { _id: new ObjectId(req.userId) },
+      { projection: { password: 0 } }
+    );
+
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        userId: user._id.toString(),
+        username: user.username,
+        email: user.email,
+        createdAt: user.createdAt
+      }
+    });
+
+  } catch (error) {
+    console.error('Profile fetch error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error fetching profile' 
+    });
+  }
+});
+
+// Update user profile (protected)
+app.put('/api/user/profile', authenticateToken, async (req, res) => {
+  try {
+    const { username } = req.body;
+
+    if (!username) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Username is required' 
+      });
+    }
+
+    // Check if username is taken by another user
+    const existingUser = await usersCollection.findOne({
+      username,
+      _id: { $ne: new ObjectId(req.userId) }
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ 
+        success: false, 
+        message: 'Username already taken' 
+      });
+    }
+
+    // Update user
+    const result = await usersCollection.findOneAndUpdate(
+      { _id: new ObjectId(req.userId) },
+      { $set: { username, updatedAt: new Date() } },
+      { returnDocument: 'after', projection: { password: 0 } }
+    );
+
+    if (!result) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: {
+        userId: result._id.toString(),
+        username: result.username,
+        email: result.email
+      }
+    });
+
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error updating profile' 
+    });
+  }
+});
+
+// Delete user account (protected)
+app.delete('/api/user/profile', authenticateToken, async (req, res) => {
+  try {
+    const result = await usersCollection.deleteOne({
+      _id: new ObjectId(req.userId)
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Account deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Account deletion error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error deleting account' 
+    });
+  }
+});
+
+// Public route (no authentication required)
+app.get('/api/public', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'This is a public endpoint',
+    data: { timestamp: new Date() }
+  });
+});
+
+// Get all users (protected - for testing/admin)
+app.get('/api/users', authenticateToken, async (req, res) => {
+  try {
+    const users = await usersCollection.find(
+      {},
+      { projection: { password: 0 } }
+    ).toArray();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        count: users.length,
+        users: users.map(u => ({
+          userId: u._id.toString(),
+          username: u.username,
+          email: u.email,
+          createdAt: u.createdAt
+        }))
+      }
+    });
+
+  } catch (error) {
+    console.error('Users fetch error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error fetching users' 
+    });
+  }
+});
+
+// ==================== ERROR HANDLING ====================
+
+app.use((req, res) => {
+  res.status(404).json({ 
+    success: false, 
+    message: 'Route not found' 
+  });
+});
+
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ 
+    success: false, 
+    message: 'Internal server error' 
+  });
+});
+
+// ==================== SERVER START ====================
+
+const PORT = process.env.PORT || 3000;
+
+connectToDatabase().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`\nAvailable endpoints:`);
+    console.log(`POST   /api/auth/signup      - Create new account`);
+    console.log(`POST   /api/auth/login       - Login to account`);
+    console.log(`POST   /api/auth/refresh     - Refresh JWT token (protected)`);
+    console.log(`GET    /api/user/profile     - Get user profile (protected)`);
+    console.log(`PUT    /api/user/profile     - Update profile (protected)`);
+    console.log(`DELETE /api/user/profile     - Delete account (protected)`);
+    console.log(`GET    /api/users            - Get all users (protected)`);
+    console.log(`GET    /api/public           - Public endpoint\n`);
+  });
+});
+
+module.exports = app;

@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Authentication System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            min-height: 600px;
+        }
+
+        .form-container {
+            flex: 1;
+            padding: 60px 50px;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .form-container.active {
+            display: flex;
+        }
+
+        .side-panel {
+            flex: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 60px 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .dashboard {
+            display: none;
+            flex-direction: column;
+            width: 100%;
+            padding: 40px;
+        }
+
+        .dashboard.active {
+            display: flex;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 14px;
+        }
+
+        .side-panel h2 {
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        .side-panel p {
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-top: 10px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+        }
+
+        .btn-secondary:hover {
+            background: white;
+            color: #667eea;
+        }
+
+        .btn-logout {
+            background: #ef4444;
+            color: white;
+            padding: 12px 30px;
+            width: auto;
+            margin-top: 20px;
+        }
+
+        .btn-logout:hover {
+            background: #dc2626;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .message.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .profile-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .profile-card h2 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .profile-info {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .info-value {
+            color: #333;
+        }
+
+        .toggle-link {
+            text-align: center;
+            margin-top: 20px;
+            color: #667eea;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .toggle-link:hover {
+            text-decoration: underline;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                max-width: 100%;
+            }
+
+            .side-panel {
+                padding: 40px 30px;
+            }
+
+            .form-container {
+                padding: 40px 30px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .side-panel h2 {
+                font-size: 28px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Signup Form -->
+        <div class="form-container active" id="signupForm">
+            <h1>Create Account</h1>
+            <p class="subtitle">Sign up to get started</p>
+            
+            <div class="message" id="signupMessage"></div>
+            
+            <form onsubmit="handleSignup(event)">
+                <div class="form-group">
+                    <label for="signup-username">Username</label>
+                    <input type="text" id="signup-username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="signup-email">Email</label>
+                    <input type="email" id="signup-email" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="signup-password">Password</label>
+                    <input type="password" id="signup-password" required 
+                           placeholder="Min 8 chars, uppercase, lowercase, number">
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Sign Up</button>
+            </form>
+            
+            <div class="toggle-link" onclick="showLogin()">
+                Already have an account? Login here
+            </div>
+            
+            <div class="loading" id="signupLoading">
+                <div class="spinner"></div>
+            </div>
+        </div>
+
+        <!-- Login Form -->
+        <div class="form-container" id="loginForm">
+            <h1>Welcome Back</h1>
+            <p class="subtitle">Login to your account</p>
+            
+            <div class="message" id="loginMessage"></div>
+            
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="login-username">Username or Email</label>
+                    <input type="text" id="login-username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Login</button>
+            </form>
+            
+            <div class="toggle-link" onclick="showSignup()">
+                Don't have an account? Sign up here
+            </div>
+            
+            <div class="loading" id="loginLoading">
+                <div class="spinner"></div>
+            </div>
+        </div>
+
+        <!-- Side Panel -->
+        <div class="side-panel" id="sidePanel">
+            <h2>🔐 Auth System</h2>
+            <p>Secure authentication with JWT tokens, password hashing, and MongoDB integration.</p>
+            <p>Built with Node.js, Express, bcrypt, and jsonwebtoken.</p>
+        </div>
+
+        <!-- Dashboard -->
+        <div class="dashboard" id="dashboard">
+            <div class="profile-card">
+                <h2>👋 Hello, <span id="profile-username">User</span>!</h2>
+                <p>Welcome to your dashboard</p>
+            </div>
+
+            <div class="profile-info">
+                <h3 style="margin-bottom: 20px; color: #333;">Profile Information</h3>
+                <div class="info-item">
+                    <span class="info-label">User ID:</span>
+                    <span class="info-value" id="profile-id">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Username:</span>
+                    <span class="info-value" id="profile-username-full">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Email:</span>
+                    <span class="info-value" id="profile-email">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Account Created:</span>
+                    <span class="info-value" id="profile-created">-</span>
+                </div>
+            </div>
+
+            <div style="text-align: center;">
+                <button class="btn btn-logout" onclick="handleLogout()">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api';
+        let authToken = localStorage.getItem('authToken');
+
+        // Check if user is already logged in
+        if (authToken) {
+            loadProfile();
+        }
+
+        function showMessage(elementId, message, type) {
+            const msgEl = document.getElementById(elementId);
+            msgEl.textContent = message;
+            msgEl.className = `message ${type} show`;
+            setTimeout(() => {
+                msgEl.className = 'message';
+            }, 5000);
+        }
+
+        function showLoading(elementId, show) {
+            const loadingEl = document.getElementById(elementId);
+            loadingEl.className = show ? 'loading show' : 'loading';
+        }
+
+        function showLogin() {
+            document.getElementById('signupForm').classList.remove('active');
+            document.getElementById('loginForm').classList.add('active');
+        }
+
+        function showSignup() {
+            document.getElementById('loginForm').classList.remove('active');
+            document.getElementById('signupForm').classList.add('active');
+        }
+
+        async function handleSignup(e) {
+            e.preventDefault();
+            showLoading('signupLoading', true);
+
+            const username = document.getElementById('signup-username').value;
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage('signupMessage', 'Account created successfully!', 'success');
+                    localStorage.setItem('authToken', data.data.token);
+                    authToken = data.data.token;
+                    setTimeout(() => loadProfile(), 1500);
+                } else {
+                    showMessage('signupMessage', data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('signupMessage', 'Error connecting to server. Make sure the server is running on port 3000.', 'error');
+            } finally {
+                showLoading('signupLoading', false);
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            showLoading('loginLoading', true);
+
+            const emailOrUsername = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ emailOrUsername, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage('loginMessage', 'Login successful!', 'success');
+                    localStorage.setItem('authToken', data.data.token);
+                    authToken = data.data.token;
+                    setTimeout(() => loadProfile(), 1500);
+                } else {
+                    showMessage('loginMessage', data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('loginMessage', 'Error connecting to server. Make sure the server is running on port 3000.', 'error');
+            } finally {
+                showLoading('loginLoading', false);
+            }
+        }
+
+        async function loadProfile() {
+            try {
+                const response = await fetch(`${API_BASE}/user/profile`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('profile-username').textContent = data.data.username;
+                    document.getElementById('profile-id').textContent = data.data.userId;
+                    document.getElementById('profile-username-full').textContent = data.data.username;
+                    document.getElementById('profile-email').textContent = data.data.email;
+                    document.getElementById('profile-created').textContent = new Date(data.data.createdAt).toLocaleString();
+
+                    // Hide forms and side panel, show dashboard
+                    document.getElementById('signupForm').classList.remove('active');
+                    document.getElementById('loginForm').classList.remove('active');
+                    document.getElementById('sidePanel').style.display = 'none';
+                    document.getElementById('dashboard').classList.add('active');
+                } else {
+                    localStorage.removeItem('authToken');
+                    authToken = null;
+                }
+            } catch (error) {
+                console.error('Error loading profile:', error);
+                localStorage.removeItem('authToken');
+                authToken = null;
+            }
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('authToken');
+            authToken = null;
+            
+            // Reset forms
+            document.getElementById('signupForm').reset();
+            document.getElementById('loginForm').reset();
+            
+            // Show login form
+            document.getElementById('dashboard').classList.remove('active');
+            document.getElementById('sidePanel').style.display = 'flex';
+            document.getElementById('loginForm').classList.add('active');
+        }
+    </script>
+</body>
+</html>
