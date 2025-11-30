@@ -1,6 +1,13 @@
 ﻿# User Authentication System
 
 A secure user authentication system built with Node.js, Express, MongoDB, and JWT (JSON Web Tokens).
+## Screenshots
+
+### Main Page - User Registration
+![Main Page](screenshots/main-page.png)
+
+### Login Page
+![Login Page](screenshots/login-page.png)
 
 ## Features
 
